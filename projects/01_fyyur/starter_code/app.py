@@ -29,6 +29,12 @@ app.config['SQLALCHEMY_DATABASE_URI']='postgresql://postgres:12814@localhost:543
 #----------------------------------------------------------------------------#
 migrate = Migrate(app, db)
 
+show = db.Table('show',
+  db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
+  db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
+  db.Column('start_time', db.Date, nullable=False)
+)
+
 class Venue(db.Model):
     __tablename__ = 'Venue'
 
@@ -44,6 +50,7 @@ class Venue(db.Model):
     website_link = db.Column(db.String(120))
     seeking_talent = db.Column(db.Boolean, default=False, nullable=False)
     seeking_description = db.Column(db.String(500))
+    artist = db.relationship('Artist', secondary=show, backref=db.backref('venue', lazy=True))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate+
 
@@ -64,15 +71,7 @@ class Artist(db.Model):
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate+
 
-class Show(db.Model):
-  __tablename__ = 'Show'
-
-  id = db.Column(db.Integer, primary_key=True)
-  artist_id = db.Column(db.Integer)
-  venue_id = db.Column(db.Integer)
-  start_time = db.Column(db.Date, nullable=False)
-
-# TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+# TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.+
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -104,6 +103,15 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
+  
+  def Merge(main, inner):
+    return main.update(inner)
+
+  areas = db.session.query(Venue.city, Venue.state).group_by(Venue.city).all()
+  for i in areas:
+    inner = {'venues': Venue.query('id', 'name').filter_by(city=areas[i].city)}
+    Merge(areas[i],inner)
+
   data=[{
     "city": "San Francisco",
     "state": "CA",
@@ -125,7 +133,8 @@ def venues():
       "num_upcoming_shows": 0,
     }]
   }]
-  return render_template('pages/venues.html', areas=data);
+
+  return render_template('pages/venues.html', areas);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
