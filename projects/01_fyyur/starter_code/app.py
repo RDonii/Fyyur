@@ -11,8 +11,11 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
+from wtforms.validators import Length
 from forms import *
 from flask_migrate import Migrate
+import datetime
+from sqlalchemy import distinct
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -24,6 +27,8 @@ db = SQLAlchemy(app)
 
 # TODO: connect to a local postgresql database+
 app.config['SQLALCHEMY_DATABASE_URI']='postgresql://postgres:12814@localhost:5432/fyyur'
+db.session.commit()
+db.create_all()
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
@@ -107,9 +112,17 @@ def venues():
   def Merge(main, inner):
     return main.update(inner)
 
-  areas = db.session.query(Venue.city, Venue.state).group_by(Venue.city).all()
+  today = datetime.datetime.today()
+
+  areas = db.session.query(distinct(Venue.city), Venue.state).all()
+  #for i in areas:
+  #  inner = Venue.query('state').filter_by(city=areas[i]).first()
+  #  Merge(areas[i],inner)
   for i in areas:
-    inner = {'venues': Venue.query('id', 'name').filter_by(city=areas[i].city)}
+    inner = {'venues': Venue.query('id', 'name').filter_by(city=areas[i].city).all()}
+    num_upcoming_shows_query =(show.query.filter_by(venue_id=inner.venues[0].id).filter(start_time>today).all())
+    num_upcoming_shows_dic = {'num_upcoming_shows': len(num_upcoming_shows_query)}
+    Merge(inner.values[0],num_upcoming_shows_dic)
     Merge(areas[i],inner)
 
   data=[{
@@ -134,7 +147,7 @@ def venues():
     }]
   }]
 
-  return render_template('pages/venues.html', areas);
+  return render_template('pages/venues.html', areas=areas);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
