@@ -91,8 +91,6 @@ class show(db.Model):
         return '<Show {}{}>'.format(self.artist_id, self.venue_id)
 
 
-db.session.commit()
-db.create_all()
 #----------------------------------------------------------------------------#
 # Filters.
 #----------------------------------------------------------------------------#
