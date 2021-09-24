@@ -20,7 +20,7 @@ from werkzeug.wrappers import response
 from wtforms.validators import Length
 from forms import *
 from flask_migrate import Migrate
-import datetime
+from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.orm import load_only
 import sys
@@ -28,68 +28,13 @@ import sys
 # App Config.
 #----------------------------------------------------------------------------#
 
-app = Flask(__name__)
-moment = Moment(app)
-app.config.from_object('config')
-db = SQLAlchemy(app)
+#Done in models.py
 
-app.config['SQLALCHEMY_DATABASE_URI']='postgresql://postgres:12814@localhost:5432/fyyur'
+
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
-migrate = Migrate(app, db)
-
-class Venue(db.Model):
-    __tablename__ = 'Venue'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(), nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=True)
-    genres = db.Column(db.ARRAY(db.String))
-    image_link = db.Column(db.String(500), nullable=True)
-    facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
-    seeking_talent = db.Column(db.Boolean, default=False, nullable=False)
-    seeking_description = db.Column(db.String(500))
-    shows = db.relationship('show', backref='Venue', lazy=True)
-
-    def __repr__(self):
-        return '<Venue {}>'.format(self.name)
-
-class Artist(db.Model):
-    __tablename__ = 'Artist'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(), nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.ARRAY(db.String))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
-    seeking_venue = db.Column(db.Boolean, default=False, nullable=False)
-    seeking_description = db.Column(db.String(500))
-    shows = db.relationship('show', backref='Artist', lazy=True)
-
-    def __repr__(self):
-        return '<Artist {}>'.format(self.name)
-
-
-class show(db.Model):
-    __tablename__ = 'show'
-
-    id = db.Column(db.Integer, primary_key=True)
-    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
-    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
-    start_time = db.Column(db.DateTime, nullable=False)
-
-    def __repr__(self):
-        return '<Show {}{}>'.format(self.artist_id, self.venue_id)
-
+from models import *
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -119,7 +64,7 @@ def index():
 @app.route('/venues')
 def venues():
 
-  today = datetime.datetime.now()
+  today = datetime.now()
   areas = []
   area = Venue.query.with_entities(func.count(Venue.id), Venue.city, Venue.state).group_by(Venue.city, Venue.state).all()
   for i in area:
@@ -166,10 +111,9 @@ def show_venue(venue_id):
   
   current_venue = Venue.query.get(venue_id)
 
-  today = datetime.datetime.now()
-  all_shows = show.query.filter_by(venue_id=venue_id)
+  today = datetime.now()
 
-  past_shows_dics = all_shows.filter(show.start_time < today).all()
+  past_shows_dics = db.session.query(show).join(Artist).filter(show.venue_id==venue_id).filter(show.start_time>today).all()
   past_shows = []
   for current_show in past_shows_dics:
     current_artist = Artist.query.get(current_show.artist_id)
@@ -181,7 +125,7 @@ def show_venue(venue_id):
     }
     past_shows.append(show_dic)
 
-  upcoming_shows_dics = all_shows.filter(show.start_time>=today).all()
+  upcoming_shows_dics = db.session.query(show).join(Artist).filter(show.venue_id==venue_id).filter(show.start_time<today).all()
   upcoming_shows = []
   for single_show in upcoming_shows_dics:
     current_artist = Artist.query.get(single_show.artist_id)
@@ -325,13 +269,13 @@ def search_artists():
 def show_artist(artist_id):
 
   data = {}
-  today = datetime.datetime.now()
+  today = datetime.now()
   requested_artist = Artist.query.get(artist_id)
   
 
   shows = show.query.filter_by(artist_id=artist_id)
 
-  raw_past_shows = shows.filter(show.start_time < today).all()
+  raw_past_shows = db.session.query(show).join(Venue).filter(show.artist_id==artist_id).filter(show.start_time>today).all()
   past_shows = []
   for single_p_show in raw_past_shows:
       venue = Venue.query.get(single_p_show.venue_id)
@@ -343,7 +287,7 @@ def show_artist(artist_id):
       }
       past_shows.append(show_data)
 
-  raw_upcoming_shows = shows.filter(show.start_time >= today).all()
+  raw_upcoming_shows = db.session.query(show).join(Venue).filter(show.artist_id==artist_id).filter(show.start_time<today).all()
   upcoming_shows = []
   for single_u_show in raw_upcoming_shows:
       venue = Venue.query.get(single_u_show.venue_id)
